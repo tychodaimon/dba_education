@@ -220,3 +220,12 @@ postgres=#  select * from persons;
 postgres=*#
 ```
 *Видим что строка sveta svetova появилась в второй транзакции, потому что обе транзакции применены*
+
+Материалы:
+- [Upgrading PostgreSQL Extensions](https://www.percona.com/blog/upgrading-postgresql-extensions/)  
+- [PostgreSQL Database Security: External Server-Based Authentication](https://www.percona.com/blog/postgresql-database-security-external-server-based-authentication/)  
+- [Lesser Known PostgreSQL Features](https://hakibenita.com/postgresql-unknown-features?ref=refind)  
+- [Implementing event sourcing using a relational database](https://softwaremill.com/implementing-event-sourcing-using-a-relational-database/)  
+
+- [Что такое Markdown и как им пользоваться](https://lifehacker.ru/chto-takoe-markdown/)  
+- [https://habr.com/ru/articles/537594/](https://habr.com/ru/articles/537594/)  
