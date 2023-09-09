@@ -303,3 +303,8 @@ dba2-2@dba2-2:~$
 logout
 Connection to 158.160.45.254 closed.
 ```
+
+
+Материалы:
+- [An Introduction to PostgreSQL Performance Tuning and Optimization](https://www.enterprisedb.com/postgres-tutorials/introduction-postgresql-performance-tuning-and-optimization)
+- [How To Partition and Format Storage Devices in Linux](https://www.digitalocean.com/community/tutorials/how-to-partition-and-format-storage-devices-in-linux)  
