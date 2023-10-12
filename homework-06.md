@@ -1,4 +1,4 @@
-# Кластер Patroni on-premise 1
+# Кластер Patroni on-premise
 
 ```
 dba@dba7-etcd1:~$ sudo su -
@@ -519,3 +519,550 @@ localhost:5432 - accepting connections
 root@dba7-pgsql1:~# systemctl enable patroni && sudo systemctl start patroni
 ```
 
+#### Проверяю кластер
+```
+dba@dba7-pgsql1:~$ patronictl -c /etc/patroni.yml list
++ Cluster: patroni (7287737210240395647) ---------+----+-----------+
+| Member      | Host        | Role    | State     | TL | Lag in MB |
++-------------+-------------+---------+-----------+----+-----------+
+| dba7-pgsql1 | 10.128.0.42 | Leader  | running   | 19 |           |
+| dba7-pgsql2 | 10.128.0.6  | Replica | streaming | 19 |         0 |
+| dba7-pgsql3 | 10.128.0.26 | Replica | streaming | 19 |         0 |
++-------------+-------------+---------+-----------+----+-----------+
+```
+
+#### На всех постгресах ставлю pgBouncer
+```
+dba@dba7-pgsql1:~$ sudo apt install -y pgbouncer
+
+root@dba7-pgsql1:~# vi /etc/pgbouncer/pgbouncer.ini
+
+root@dba7-pgsql1:~# cat /etc/pgbouncer/pgbouncer.ini
+;;;
+;;; PgBouncer configuration file
+;;;
+
+;; database name = connect string
+;;
+;; connect string params:
+;;   dbname= host= port= user= password= auth_user=
+;;   client_encoding= datestyle= timezone=
+;;   pool_size= reserve_pool= max_db_connections=
+;;   pool_mode= connect_query= application_name=
+[databases]
+
+;; foodb over Unix socket
+;foodb =
+
+;; redirect bardb to bazdb on localhost
+;bardb = host=localhost dbname=bazdb
+
+;; access to dest database will go with single user
+;forcedb = host=localhost port=300 user=baz password=foo client_encoding=UNICODE datestyle=ISO connect_query='SELECT 1'
+
+;; use custom pool sizes
+;nondefaultdb = pool_size=50 reserve_pool=10
+
+;; use auth_user with auth_query if user not present in auth_file
+;; auth_user must exist in auth_file
+; foodb = auth_user=bar
+
+;; run auth_query on a specific database.
+; bardb = auth_dbname=foo
+
+;; fallback connect string
+;* = host=testserver
+
+;; User-specific configuration
+[users]
+
+;user1 = pool_mode=transaction max_user_connections=10
+
+;; Configuration section
+[pgbouncer]
+
+;;;
+;;; Administrative settings
+;;;
+
+logfile = /var/log/postgresql/pgbouncer.log
+pidfile = /var/run/postgresql/pgbouncer.pid
+
+;;;
+;;; Where to wait for clients
+;;;
+
+;; IP address or * which means all IPs
+listen_addr = localhost
+listen_port = 6432
+
+;; Unix socket is also used for -R.
+;; On Debian it should be /var/run/postgresql
+;unix_socket_dir = /tmp
+;unix_socket_mode = 0777
+;unix_socket_group =
+unix_socket_dir = /var/run/postgresql
+
+;; The peer id used to identify this pgbouncer process in a group of pgbouncer
+;; processes that are peered together. When set to 0 pgbouncer peering is disabled
+;peer_id = 0
+
+;;;
+;;; TLS settings for accepting clients
+;;;
+
+;; disable, allow, require, verify-ca, verify-full
+;client_tls_sslmode = disable
+
+;; Path to file that contains trusted CA certs
+;client_tls_ca_file = <system default>
+
+;; Private key and cert to present to clients.
+;; Required for accepting TLS connections from clients.
+;client_tls_key_file =
+;client_tls_cert_file =
+
+;; fast, normal, secure, legacy, <ciphersuite string>
+;client_tls_ciphers = fast
+
+;; all, secure, tlsv1.0, tlsv1.1, tlsv1.2, tlsv1.3
+;client_tls_protocols = secure
+
+;; none, auto, legacy
+;client_tls_dheparams = auto
+
+;; none, auto, <curve name>
+;client_tls_ecdhcurve = auto
+
+;;;
+;;; TLS settings for connecting to backend databases
+;;;
+
+;; disable, allow, require, verify-ca, verify-full
+;server_tls_sslmode = disable
+
+;; Path to that contains trusted CA certs
+;server_tls_ca_file = <system default>
+
+;; Private key and cert to present to backend.
+;; Needed only if backend server require client cert.
+;server_tls_key_file =
+;server_tls_cert_file =
+
+;; all, secure, tlsv1.0, tlsv1.1, tlsv1.2, tlsv1.3
+;server_tls_protocols = secure
+
+;; fast, normal, secure, legacy, <ciphersuite string>
+;server_tls_ciphers = fast
+
+;;;
+;;; Authentication settings
+;;;
+
+;; any, trust, plain, md5, cert, hba, pam
+auth_type = md5
+auth_file = /etc/pgbouncer/userlist.txt
+
+;; Path to HBA-style auth config
+;auth_hba_file =
+
+;; Query to use to fetch password from database.  Result
+;; must have 2 columns - username and password hash.
+;auth_query = SELECT usename, passwd FROM pg_shadow WHERE usename=$1
+
+;; Authentication database that can be set globally to run "auth_query".
+;auth_dbname =
+
+;;;
+;;; Users allowed into database 'pgbouncer'
+;;;
+
+;; comma-separated list of users who are allowed to change settings
+;admin_users = user2, someadmin, otheradmin
+
+;; comma-separated list of users who are just allowed to use SHOW command
+;stats_users = stats, root
+
+;;;
+;;; Pooler personality questions
+;;;
+
+;; When server connection is released back to pool:
+;;   session      - after client disconnects (default)
+;;   transaction  - after transaction finishes
+;;   statement    - after statement finishes
+;pool_mode = session
+
+;; Query for cleaning connection immediately after releasing from
+;; client.  No need to put ROLLBACK here, pgbouncer does not reuse
+;; connections where transaction is left open.
+;server_reset_query = DISCARD ALL
+
+;; Whether server_reset_query should run in all pooling modes.  If it
+;; is off, server_reset_query is used only for session-pooling.
+;server_reset_query_always = 0
+
+;; Comma-separated list of parameters to track per client.  The
+;; Postgres parameters listed here will be cached per client by
+;; pgbouncer and restored in server everytime the client runs a query.
+;track_extra_parameters = IntervalStyle
+
+;; Comma-separated list of parameters to ignore when given in startup
+;; packet.  Newer JDBC versions require the extra_float_digits here.
+;ignore_startup_parameters = extra_float_digits
+
+;; When taking idle server into use, this query is run first.
+;server_check_query = select 1
+
+;; If server was used more recently that this many seconds ago,
+; skip the check query.  Value 0 may or may not run in immediately.
+;server_check_delay = 30
+
+;; Close servers in session pooling mode after a RECONNECT, RELOAD,
+;; etc. when they are idle instead of at the end of the session.
+;server_fast_close = 0
+
+;; Use <appname - host> as application_name on server.
+;application_name_add_host = 0
+
+;; Period for updating aggregated stats.
+;stats_period = 60
+
+;;;
+;;; Connection limits
+;;;
+
+;; Total number of clients that can connect
+;max_client_conn = 100
+
+;; Default pool size.  20 is good number when transaction pooling
+;; is in use, in session pooling it needs to be the number of
+;; max clients you want to handle at any moment
+;default_pool_size = 20
+
+;; Minimum number of server connections to keep in pool.
+;min_pool_size = 0
+
+; how many additional connection to allow in case of trouble
+;reserve_pool_size = 0
+
+;; If a clients needs to wait more than this many seconds, use reserve
+;; pool.
+;reserve_pool_timeout = 5
+
+;; Maximum number of server connections for a database
+;max_db_connections = 0
+
+;; Maximum number of server connections for a user
+;max_user_connections = 0
+
+;; If off, then server connections are reused in LIFO manner
+;server_round_robin = 0
+
+;;;
+;;; Logging
+;;;
+
+;; Syslog settings
+;syslog = 0
+;syslog_facility = daemon
+;syslog_ident = pgbouncer
+
+;; log if client connects or server connection is made
+;log_connections = 1
+
+;; log if and why connection was closed
+;log_disconnections = 1
+
+;; log error messages pooler sends to clients
+;log_pooler_errors = 1
+
+;; write aggregated stats into log
+;log_stats = 1
+
+;; Logging verbosity.  Same as -v switch on command line.
+;verbose = 0
+
+;;;
+;;; Timeouts
+;;;
+
+;; Close server connection if its been connected longer.
+;server_lifetime = 3600
+
+;; Close server connection if its not been used in this time.  Allows
+;; to clean unnecessary connections from pool after peak.
+;server_idle_timeout = 600
+
+;; Cancel connection attempt if server does not answer takes longer.
+;server_connect_timeout = 15
+
+;; If server login failed (server_connect_timeout or auth failure)
+;; then wait this many second before trying again.
+;server_login_retry = 15
+
+;; Dangerous.  Server connection is closed if query does not return in
+;; this time.  Should be used to survive network problems, _not_ as
+;; statement_timeout. (default: 0)
+;query_timeout = 0
+
+;; Dangerous.  Client connection is closed if the query is not
+;; assigned to a server in this time.  Should be used to limit the
+;; number of queued queries in case of a database or network
+;; failure. (default: 120)
+;query_wait_timeout = 120
+
+;; Dangerous.  Client connection is closed if the cancellation request
+;; is not assigned to a server in this time.  Should be used to limit
+;; the time a client application blocks on a queued cancel request in
+;; case of a database or network failure. (default: 120)
+;cancel_wait_timeout = 10
+
+;; Dangerous.  Client connection is closed if no activity in this
+;; time.  Should be used to survive network problems. (default: 0)
+;client_idle_timeout = 0
+
+;; Disconnect clients who have not managed to log in after connecting
+;; in this many seconds.
+;client_login_timeout = 60
+
+;; Clean automatically created database entries (via "*") if they stay
+;; unused in this many seconds.
+; autodb_idle_timeout = 3600
+
+;; Close connections which are in "IDLE in transaction" state longer
+;; than this many seconds.
+;idle_transaction_timeout = 0
+
+;; How long SUSPEND/-R waits for buffer flush before closing
+;; connection.
+;suspend_timeout = 10
+
+;;;
+;;; Low-level tuning options
+;;;
+
+;; buffer for streaming packets
+;pkt_buf = 4096
+
+;; man 2 listen
+;listen_backlog = 128
+
+;; Max number pkt_buf to process in one event loop.
+;sbuf_loopcnt = 5
+
+;; Maximum PostgreSQL protocol packet size.
+;max_packet_size = 2147483647
+
+;; Set SO_REUSEPORT socket option
+;so_reuseport = 0
+
+;; networking options, for info: man 7 tcp
+
+;; Linux: Notify program about new connection only if there is also
+;; data received.  (Seconds to wait.)  On Linux the default is 45, on
+;; other OS'es 0.
+;tcp_defer_accept = 0
+
+;; In-kernel buffer size (Linux default: 4096)
+;tcp_socket_buffer = 0
+
+;; whether tcp keepalive should be turned on (0/1)
+;tcp_keepalive = 1
+
+;; The following options are Linux-specific.  They also require
+;; tcp_keepalive=1.
+
+;; Count of keepalive packets
+;tcp_keepcnt = 0
+
+;; How long the connection can be idle before sending keepalive
+;; packets
+;tcp_keepidle = 0
+
+;; The time between individual keepalive probes
+;tcp_keepintvl = 0
+
+;; How long may transmitted data remain unacknowledged before TCP
+;; connection is closed (in milliseconds)
+;tcp_user_timeout = 0
+
+;; DNS lookup caching time
+;dns_max_ttl = 15
+
+;; DNS zone SOA lookup period
+;dns_zone_check_period = 0
+
+;; DNS negative result caching time
+;dns_nxdomain_ttl = 15
+
+;; Custom resolv.conf file, to set custom DNS servers or other options
+;; (default: empty = use OS settings)
+;resolv_conf = /etc/pgbouncer/resolv.conf
+
+;;;
+;;; Random stuff
+;;;
+
+;; Hackish security feature.  Helps against SQL injection: when PQexec
+;; is disabled, multi-statement cannot be made.
+;disable_pqexec = 0
+
+;; Config file to use for next RELOAD/SIGHUP
+;; By default contains config file from command line.
+;conffile
+
+;; Windows service name to register as.  job_name is alias for
+;; service_name, used by some Skytools scripts.
+;service_name = pgbouncer
+;job_name = pgbouncer
+
+;; Read additional config from other file
+;%include /etc/pgbouncer/pgbouncer-other.ini
+
+[databases]
+otus = host=127.0.0.1 port=5432 dbname=otus
+[pgbouncer]
+logfile = /var/log/postgresql/pgbouncer.log
+pidfile = /var/run/postgresql/pgbouncer.pid
+listen_addr = *
+listen_port = 6432
+auth_type = md5
+auth_file = /etc/pgbouncer/userlist.txt
+admin_users = admindb, postgres
+```
+
+#### Проверяю что все ок и создаю тестовую базу данных
+```
+root@dba7-pgsql1:~# sudo -u postgres psql -h localhost -c "CREATE DATABASE otus;"
+CREATE DATABASE
+```
+
+#### Доавляю запись в pgpass
+```
+postgres@dba7-pgsql1:~$ echo "localhost:5432:postgres:postgres:zalando_321">>~/.pgpass
+postgres@dba7-pgsql1:~$ echo "localhost:5432:otus:postgres:zalando_321">>~/.pgpass
+postgres@dba7-pgsql1:~$ chmod 600 ~/.pgpass
+
+
+postgres@dba7-pgsql1:~$ psql -h localhost
+localhost postgres@postgres=# create user admindb with password 'root123';
+
+localhost postgres@postgres=# \du
+                                    List of roles
+  Role name  |                         Attributes                         | Member of
+-------------+------------------------------------------------------------+-----------
+ admindb     |                                                            | {}
+ postgres    | Superuser, Create role, Create DB, Replication, Bypass RLS | {}
+ replicator  | Replication                                                | {}
+ rewind_user | Replication                                                | {}
+
+localhost postgres@postgres=# select usename,passwd from pg_shadow;
+   usename   |                                                                passwd
+-------------+---------------------------------------------------------------------------------------------------------------------------------------
+ postgres    | SCRAM-SHA-256$4096:732gAsIxkd+rY2rL91/2RQ==$yGy5yKxWYjq8pPL5wYIDCrkUeyRWh+MGsAsegrpDnkM=:0kTaQr3WR3bWxcdIkx3ioM6syI3NsrLNuWQV5+eYLyA=
+ replicator  | SCRAM-SHA-256$4096:tYDzvixLzrQAcBw+e5nXQg==$ln7P0AfTjA+HLMqwgw+HOczdfsqBN0FnzG82bf0XIKQ=:Wh99wmw3z89LBSz+sD3BZLufMuefQkXQ8gN1BJTG8B8=
+ rewind_user | SCRAM-SHA-256$4096:V+ybGF4WBqdtGIhXSZIe3w==$Y7cub1tP/OAom8Ingua9P0qo1JfZZD75x8WzaWkc2HA=:uxy8zfLndfw6bY3GRStTXFqQuv+ThtIwMJ4QzvPLQ8E=
+ admindb     | SCRAM-SHA-256$4096:pqu59EyyDXREBgIGPLlYfw==$B7ckmWLf37ZU5R/darh/h2vWZbT471UoRTk/C5q6sgI=:aP2EXVg8VjHzqazNeiXaxeRULTRBSUqv5S0WQEyFUhA=
+(4 rows)
+
+root@dba7-pgsql1:~# vi /etc/pgbouncer/userlist.txt
+root@dba7-pgsql1:~# cat /etc/pgbouncer/userlist.txt
+"admindb" "d9cfab6a2f1a0eb0c037e605cd578025"
+"postgres"  "SCRAM-SHA-256$4096:732gAsIxkd+rY2rL91/2RQ==$yGy5yKxWYjq8pPL5wYIDCrkUeyRWh+MGsAsegrpDnkM=:0kTaQr3WR3bWxcdIkx3ioM6syI3NsrLNuWQV5+eYLyA="
+```
+
+#### Проверяю
+```
+postgres@dba7-pgsql1:~$ psql -p 6432 pgbouncer -h localhost
+Password for user postgres:
+psql (14.9 (Ubuntu 14.9-1.pgdg22.04+1), server 1.20.1/bouncer)
+Type "help" for help.
+
+localhost postgres@pgbouncer=#
+\q
+postgres@dba7-pgsql1:~$ psql -p 6432 -h 127.0.0.1 -d otus -U postgres
+Password for user postgres:
+psql (14.9 (Ubuntu 14.9-1.pgdg22.04+1))
+Type "help" for help.
+```
+
+#### Ставлю haproxy
+```
+root@dba7-haproxy1:~# sudo apt install -y --no-install-recommends software-properties-common && sudo add-apt-repository -y ppa:vbernat/haproxy-2.5 && sudo apt install -y haproxy=2.5.\*
+
+root@dba7-haproxy1:~# vi /etc/haproxy/haproxy.cfg
+root@dba7-haproxy1:~# cat /etc/haproxy/haproxy.cfg
+global
+	log /dev/log	local0
+	log /dev/log	local1 notice
+	chroot /var/lib/haproxy
+	stats socket /run/haproxy/admin.sock mode 660 level admin expose-fd listeners
+	stats timeout 30s
+	user haproxy
+	group haproxy
+	daemon
+
+	# Default SSL material locations
+	ca-base /etc/ssl/certs
+	crt-base /etc/ssl/private
+
+	# See: https://ssl-config.mozilla.org/#server=haproxy&server-version=2.0.3&config=intermediate
+        ssl-default-bind-ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384
+        ssl-default-bind-ciphersuites TLS_AES_128_GCM_SHA256:TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256
+        ssl-default-bind-options ssl-min-ver TLSv1.2 no-tls-tickets
+
+defaults
+	log	global
+	mode	http
+	option	httplog
+	option	dontlognull
+        timeout connect 5000
+        timeout client  50000
+        timeout server  50000
+	errorfile 400 /etc/haproxy/errors/400.http
+	errorfile 403 /etc/haproxy/errors/403.http
+	errorfile 408 /etc/haproxy/errors/408.http
+	errorfile 500 /etc/haproxy/errors/500.http
+	errorfile 502 /etc/haproxy/errors/502.http
+	errorfile 503 /etc/haproxy/errors/503.http
+	errorfile 504 /etc/haproxy/errors/504.http
+
+listen postgres_write
+    bind *:5432
+    mode            tcp
+    option httpchk
+    http-check connect
+    http-check send meth GET uri /master
+    http-check expect status 200
+    default-server inter 10s fall 3 rise 3 on-marked-down shutdown-sessions
+    server pgsql1 10.128.0.42:6432 check port 8008
+    server pgsql2 10.128.0.6:6432 check port 8008
+    server pgsql3 10.128.0.26:6432 check port 8008
+
+listen postgres_read
+    bind *:5433
+    mode            tcp
+    http-check connect
+    http-check send meth GET uri /replica
+    http-check expect status 200
+    default-server inter 10s fall 3 rise 3 on-marked-down shutdown-sessions
+    server pgsql1 10.128.0.42:6432 check port 8008
+    server pgsql2 10.128.0.6:6432 check port 8008
+    server pgsql3 10.128.0.26:6432 check port 8008
+```
+
+#### Клиент для postgres
+```
+root@dba7-haproxy1:~# apt update && sudo apt upgrade -y && sudo apt install -y postgresql-client-common && sudo apt install postgresql-client -y
+```
+
+#### Проверяю
+```
+root@dba7-haproxy1:~# psql -h localhost -d otus -U postgres -p 5432
+Password for user postgres:
+psql (14.9 (Ubuntu 14.9-0ubuntu0.22.04.1))
+Type "help" for help.
+
+otus=#
+```
