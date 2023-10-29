@@ -2,14 +2,14 @@
 
 #### Ставим docker
 ```
-dba9@dba9-minikube2:~$ sudo apt-get install ca-certificates curl gnupg
-dba9@dba9-minikube2:~$ sudo install -m 0755 -d /etc/apt/keyrings
-dba9@dba9-minikube2:~$ curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
-dba9@dba9-minikube2:~$ sudo chmod a+r /etc/apt/keyrings/docker.gpg
-dba9@dba9-minikube2:~$ echo   "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+sudo apt-get install ca-certificates curl gnupg
+sudo install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo   "deb [arch="$(dpkg --print-architecture)" signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
   "$(. /etc/os-release && echo "$VERSION_CODENAME")" stable" |   sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
-dba9@dba9-minikube2:~$ sudo apt-get update
-dba9@dba9-minikube2:~$ sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+sudo apt-get update
+sudo apt-get install docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
 
 #### Ставим minikube
@@ -130,15 +130,15 @@ http://192.168.49.2:31045
 
 #### Устанавливаем клиента
 ```
-dba9@dba9-minikube2:~$ sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/postgres.list'
-dba9@dba9-minikube2:~$ wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
-dba9@dba9-minikube2:~$ sudo apt update
-dba9@dba9-minikube2:~$ sudo apt install postgresql-client-14
+sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/postgres.list'
+wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+sudo apt update
+sudo apt install postgresql-client-14
 ```
 
 #### Проверяем что все работает
 ```
-dba9@dba9-minikube2:~$ psql -h 192.168.49.2 -p 31045 -U myuser -W myapp
+psql -h 192.168.49.2 -p 31045 -U myuser -W myapp
 Password:
 psql (14.9 (Ubuntu 14.9-1.pgdg22.04+1), server 16.0 (Debian 16.0-1.pgdg120+1))
 WARNING: psql major version 14, server major version 16.
