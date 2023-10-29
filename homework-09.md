@@ -43,3 +43,107 @@ kubectl version -o json --client
   "kustomizeVersion": "v5.0.4-0.20230601165947-6ce0bf390ce3"
 }
 ```
+
+#### Запускаем minikube и переключаем окружение на его докер
+```
+sudo chmod 0755 /var/run/docker.sock
+sudo chown dba9:dba9 /var/run/docker.sock
+minikube start --vm-driver=docker
+minikube docker-env
+export DOCKER_TLS_VERIFY="1"
+export DOCKER_HOST="tcp://192.168.49.2:2376"
+export DOCKER_CERT_PATH="/home/dba9/.minikube/certs"
+export MINIKUBE_ACTIVE_DOCKERD="minikube"
+docker ps
+```
+
+#### Запускаем докер дашборд и делаем его доступным извне
+```
+minikube dashboard
+kubectl proxy --address='0.0.0.0' --disable-filter=true
+```
+
+#### Разворачиваем postgres
+```
+cat postgres.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: postgres
+spec:
+  type: NodePort
+  ports:
+   - port: 5432
+  selector:
+    app: postgres
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres-statefulset
+spec:
+  serviceName: "postgres"
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:latest
+        ports:
+        - containerPort: 5432
+          name: postgredb
+        env:
+          - name: POSTGRES_DB
+            value: myapp
+          - name: POSTGRES_USER
+            value: myuser
+          - name: POSTGRES_PASSWORD
+            value: passwd
+        volumeMounts:
+        - name: postgredb
+          mountPath: /var/lib/postgresql/data
+          subPath: postgres
+  volumeClaimTemplates:
+  - metadata:
+      name: postgredb
+    spec:
+      accessModes: [ "ReadWriteOnce" ]
+      storageClassName: standard
+      resources:
+        requests:
+          storage: 1Gi
+
+kubectl apply -f ./postgres.yaml
+
+dba9@dba9-minikube2:~/otus/postgres$ minikube service postgres --url -n pg-kub2
+http://192.168.49.2:31045
+```
+
+#### Устанавливаем клиента
+```
+dba9@dba9-minikube2:~$ sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/postgres.list'
+dba9@dba9-minikube2:~$ wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+dba9@dba9-minikube2:~$ sudo apt update
+dba9@dba9-minikube2:~$ sudo apt install postgresql-client-14
+```
+
+#### Проверяем что все работает
+```
+dba9@dba9-minikube2:~$ psql -h 192.168.49.2 -p 31045 -U myuser -W myapp
+Password:
+psql (14.9 (Ubuntu 14.9-1.pgdg22.04+1), server 16.0 (Debian 16.0-1.pgdg120+1))
+WARNING: psql major version 14, server major version 16.
+         Some psql features might not work.
+Type "help" for help.
+
+myapp=#
+```
