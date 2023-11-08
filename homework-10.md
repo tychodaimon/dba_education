@@ -69,7 +69,7 @@ otus=# CREATE TABLE public.t_cars
 );
 CREATE TABLE
 ```
- апм 
+
 #### Скачиваем архив https://www.kaggle.com/datasets/govzegunns/mimovrste-2021-2023-item-prices (95Gb)
 ```
 postgres@dba10-pg:~$ screen -t loader
@@ -224,7 +224,6 @@ vi /etc/clickhouse-server/config.xml
 sudo systemctl start clickhouse-server
 sudo systemctl enable clickhouse-server
 sudo systemctl status clickhouse-server
-
 ```
 
 #### Создаем базу данных и таблицу
